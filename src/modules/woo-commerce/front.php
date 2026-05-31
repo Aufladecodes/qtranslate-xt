@@ -39,6 +39,61 @@ function qtranxf_wc_add_filters_front(): void {
 
     add_action( 'woocommerce_dropdown_variation_attribute_options_args', 'qtranxf_wc_dropdown_variation_attribute_options_args', 10, 1 );
     add_filter( 'woocommerce_paypal_args', 'qtranxf_wc_paypal_args' );
+
+    add_filter( 'woocommerce_structured_data_product', 'qtranxf_wc_structured_data_product', 10, 2 );
+    add_filter( 'woocommerce_structured_data_breadcrumblist', 'qtranxf_wc_structured_data_breadcrumblist', 10, 2 );
+
+    // get_the_term_list() — used by WC's posted_in single-product meta box — caches term-name
+    // links and bypasses term_name filters once the WP object-term cache is warm. Translate the
+    // visible text inside each rendered <a> tag as a last-mile pass.
+    add_filter( 'term_links-product_cat', 'qtranxf_wc_filter_term_links' );
+    add_filter( 'term_links-product_tag', 'qtranxf_wc_filter_term_links' );
+}
+
+/**
+ * Strip qTranslate language tags from WooCommerce's own product JSON-LD schema.
+ * WC emits its structured data independently of Yoast, so the wp-seo module's
+ * filters don't reach it. Without this, the product `description` (and `name`)
+ * keep raw `[:de]…[:en]…[:]` literals on multilingual sites.
+ */
+function qtranxf_wc_structured_data_product( $markup, $product ): array {
+    foreach ( [ 'name', 'description' ] as $field ) {
+        if ( isset( $markup[ $field ] ) && is_string( $markup[ $field ] ) ) {
+            $markup[ $field ] = qtranxf_useCurrentLanguageIfNotFoundUseDefaultLanguage( $markup[ $field ] );
+        }
+    }
+
+    return $markup;
+}
+
+/**
+ * Strip qTranslate language tags from WC's BreadcrumbList JSON-LD. Each item's
+ * `name` is read from the term object directly and can contain raw tags.
+ */
+function qtranxf_wc_filter_term_links( $term_links ): array {
+    foreach ( $term_links as $i => $link ) {
+        $term_links[ $i ] = preg_replace_callback( '/>([^<]+)</', function ( $m ) {
+            return '>' . qtranxf_useCurrentLanguageIfNotFoundUseDefaultLanguage( $m[1] ) . '<';
+        }, $link );
+    }
+
+    return $term_links;
+}
+
+function qtranxf_wc_structured_data_breadcrumblist( $markup, $breadcrumbs ): array {
+    if ( isset( $markup['itemListElement'] ) && is_array( $markup['itemListElement'] ) ) {
+        foreach ( $markup['itemListElement'] as $i => $item ) {
+            if ( isset( $item['item']['name'] ) ) {
+                $markup['itemListElement'][ $i ]['item']['name'] = qtranxf_useCurrentLanguageIfNotFoundUseDefaultLanguage( $item['item']['name'] );
+            }
+            // Older WC versions put `name` directly on the list item, not nested under `item`.
+            if ( isset( $item['name'] ) ) {
+                $markup['itemListElement'][ $i ]['name'] = qtranxf_useCurrentLanguageIfNotFoundUseDefaultLanguage( $item['name'] );
+            }
+        }
+    }
+
+    return $markup;
 }
 
 function qtranxf_wc_filter_postmeta( $original_value, int $object_id, string $meta_key = '', bool $single = false ) {
