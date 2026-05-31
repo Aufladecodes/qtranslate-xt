@@ -180,6 +180,19 @@ function qtranxf_wpseo_add_filters_front(): void {
 
     add_filter( 'wpseo_schema_person', 'qtranxf_wpseo_schema_person' );
 
+    function qtranxf_wpseo_schema_product( $piece, $context ): array {
+        if ( isset( $piece['description'] ) ) {
+            $piece['description'] = qtranxf_useCurrentLanguageIfNotFoundUseDefaultLanguage( $piece['description'] );
+        }
+        if ( isset( $piece['name'] ) ) {
+            $piece['name'] = qtranxf_useCurrentLanguageIfNotFoundUseDefaultLanguage( $piece['name'] );
+        }
+
+        return $piece;
+    }
+
+    add_filter( 'wpseo_schema_product', 'qtranxf_wpseo_schema_product', 10, 2 );
+
     function qtranxf_wpseo_next_prev_filter( $link ) {
         global $q_config;
 
